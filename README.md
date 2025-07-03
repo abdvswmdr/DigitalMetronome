@@ -1,6 +1,6 @@
-# ESP32 Digital Metronome
+# Digital Metronome (ESP32-based) 
 
-A professional digital metronome built with ESP32 microcontroller, featuring four customizable preset sets, OLED display, and intuitive button controls.
+A digital metronome built with ESP32 microcontroller, featuring four customizable preset sets, OLED display, and intuitive button controls.
 
 ## 🎵 Features
 
@@ -212,7 +212,7 @@ const int BUZZER_DURATION = 20;        // Buzzer duration (ms)
 
 ## 📄 License
 
-This project is developed for educational and professional use. Please respect the collaborative nature of this project.
+This project is developed for research and professional use. 
 
 ---
 
