@@ -1,0 +1,40 @@
+# Arduino IDE files
+*.hex
+*.elf
+*.bin
+*.map
+
+# Build directories
+build/
+.build/
+
+# IDE specific files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS specific files
+.DS_Store
+Thumbs.db
+
+# Temporary files
+*.tmp
+*.bak
+*.orig
+
+# Documentation build files
+docs/_build/
+
+# Libraries (if locally installed)
+libraries/
+
+# Compiled libraries
+*.a
+*.so
+*.dylib
+*.dll
+
+# Log files
+*.log
