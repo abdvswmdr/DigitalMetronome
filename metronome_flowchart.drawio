@@ -1,0 +1,275 @@
+<mxfile host="Electron" agent="Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) draw.io/27.0.9 Chrome/134.0.6998.205 Electron/35.4.0 Safari/537.36" version="27.0.9">
+  <diagram name="ESP32 Digital Metronome System Flow" id="metronome-system">
+    <mxGraphModel dx="1868" dy="902" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1400" pageHeight="1000" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="title" value="ESP32 DIGITAL METRONOME - SYSTEM OPERATION FLOWCHART" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=16;fontStyle=1;fontColor=#000000;" parent="1" vertex="1">
+          <mxGeometry x="400" y="10" width="600" height="30" as="geometry" />
+        </mxCell>
+        <mxCell id="init-start" value="SYSTEM POWER ON" style="ellipse;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=14;fontStyle=1" parent="1" vertex="1">
+          <mxGeometry x="80" y="60" width="160" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="init-hardware" value="Initialize Hardware&lt;br&gt;GPIO Pins (D12, D15, D34, D19)&lt;br&gt;I2C Bus (SDA=4, SCL=5)&lt;br&gt;PWM Channel for Buzzer&lt;br&gt;OLED Display (128x32)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=11" parent="1" vertex="1">
+          <mxGeometry x="60" y="160" width="200" height="80" as="geometry" />
+        </mxCell>
+        <mxCell id="init-defaults" value="Load Default Preset Sets&lt;br&gt;Set 1: 120 BPM, 4/4&lt;br&gt;Set 2: 140 BPM, 2/4&lt;br&gt;Set 3: 90 BPM, 3/4&lt;br&gt;Set 4: 160 BPM, 4/8" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=11" parent="1" vertex="1">
+          <mxGeometry x="60" y="280" width="200" height="80" as="geometry" />
+        </mxCell>
+        <mxCell id="main-screen" value="MAIN SCREEN&lt;br&gt;Current Set (S1-S4)&lt;br&gt;BPM Display&lt;br&gt;Time Signature&lt;br&gt;Beat Indicator&lt;br&gt;Status (PLAYING/PAUSED)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontSize=12;fontStyle=1" parent="1" vertex="1">
+          <mxGeometry x="70" y="395" width="180" height="100" as="geometry" />
+        </mxCell>
+        <mxCell id="main-loop" value="MAIN CONTROL LOOP" style="hexagon;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontSize=14;fontStyle=1" parent="1" vertex="1">
+          <mxGeometry x="290" y="140" width="180" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="btn-handler" value="Button Input Handler" style="diamond;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=12" parent="1" vertex="1">
+          <mxGeometry x="620" y="295" width="140" height="100" as="geometry" />
+        </mxCell>
+        <mxCell id="btn1-check" value="Button 1 (D12)&lt;br&gt;Pressed?" style="diamond;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=11" parent="1" vertex="1">
+          <mxGeometry x="1000" y="140" width="120" height="80" as="geometry" />
+        </mxCell>
+        <mxCell id="btn1-long-check" value="Long Press&lt;br&gt;(over 2 seconds)?" style="diamond;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=10" parent="1" vertex="1">
+          <mxGeometry x="1180" y="80" width="100" height="70" as="geometry" />
+        </mxCell>
+        <mxCell id="enter-settings" value="Enter Settings Mode&lt;br&gt;Switch to SET 1&lt;br&gt;Reset editing parameters&lt;br&gt;Display settings screen" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=10" parent="1" vertex="1">
+          <mxGeometry x="1330" y="80" width="160" height="70" as="geometry" />
+        </mxCell>
+        <mxCell id="btn1-short" value="Short Press&lt;br&gt;Cycle Parameters&lt;br&gt;BPM - Beats - Notes" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d79b00;fontSize=10" parent="1" vertex="1">
+          <mxGeometry x="1200" y="170" width="140" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="btn2-check" value="Button 2 (D15)&lt;br&gt;Pressed?" style="diamond;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=11" parent="1" vertex="1">
+          <mxGeometry x="1090" y="530" width="120" height="80" as="geometry" />
+        </mxCell>
+        <mxCell id="btn2-context" value="Current Mode?" style="diamond;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=11" parent="1" vertex="1">
+          <mxGeometry x="1180" y="280" width="100" height="80" as="geometry" />
+        </mxCell>
+        <mxCell id="btn2-settings" value="Settings Mode&lt;br&gt;Short: Save Set and Next&lt;br&gt;Long: Exit to Main" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=10" parent="1" vertex="1">
+          <mxGeometry x="1350" y="200" width="140" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="btn2-main" value="Main Mode&lt;br&gt;Toggle Play/Pause&lt;br&gt;Reset beat counter" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontSize=10" parent="1" vertex="1">
+          <mxGeometry x="1320" y="320" width="140" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="pot-handler" value="Potentiometer Input&lt;br&gt;(Analog Read)" style="diamond;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=11" parent="1" vertex="1">
+          <mxGeometry x="310" y="30" width="140" height="80" as="geometry" />
+        </mxCell>
+        <mxCell id="pot-settings-check" value="In Settings&lt;br&gt;Mode?" style="diamond;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=10" parent="1" vertex="1">
+          <mxGeometry x="970" y="370" width="100" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="pot-adjust" value="Adjust Current Parameter&lt;br&gt;BPM: 40-240&lt;br&gt;Numerator: 1-8&lt;br&gt;Denominator: 1,2,4,8" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d79b00;fontSize=10" parent="1" vertex="1">
+          <mxGeometry x="1160" y="375" width="160" height="70" as="geometry" />
+        </mxCell>
+        <mxCell id="metronome-engine" value="METRONOME ENGINE" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontSize=14;fontStyle=1" parent="1" vertex="1">
+          <mxGeometry x="70" y="590" width="160" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="timing-calc" value="Timing Calculation&lt;br&gt;Interval = 60000ms / BPM&lt;br&gt;Check if beat time elapsed" style="diamond;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=11" parent="1" vertex="1">
+          <mxGeometry x="260" y="580" width="140" height="80" as="geometry" />
+        </mxCell>
+        <mxCell id="audio-output" value="Audio Output&lt;br&gt;Generate 4500Hz tone&lt;br&gt;20ms duration&lt;br&gt;PWM control" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d79b00;fontSize=11" parent="1" vertex="1">
+          <mxGeometry x="440" y="580" width="140" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="beat-tracking" value="Beat and Measure Tracking&lt;br&gt;Increment beat counter&lt;br&gt;Reset at numerator&lt;br&gt;Count measures" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontSize=11" parent="1" vertex="1">
+          <mxGeometry x="620" y="580" width="160" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="set-cycling" value="Automatic Set Cycling&lt;br&gt;After 16 measures:&lt;br&gt;Set 1-2-3-4-1..." style="diamond;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=11" parent="1" vertex="1">
+          <mxGeometry x="820" y="580" width="140" height="80" as="geometry" />
+        </mxCell>
+        <mxCell id="display-system" value="DISPLAY SYSTEM" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontSize=14;fontStyle=1" parent="1" vertex="1">
+          <mxGeometry x="60" y="720" width="160" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="display-mode" value="Display Mode?" style="diamond;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=12" parent="1" vertex="1">
+          <mxGeometry x="260" y="700" width="120" height="80" as="geometry" />
+        </mxCell>
+        <mxCell id="main-display" value="Main Screen Display&lt;br&gt;Large BPM number&lt;br&gt;Time signature&lt;br&gt;Set indicator (S1-S4)&lt;br&gt;Beat indicator (circle)&lt;br&gt;Status text&lt;br&gt;Beat count" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=10" parent="1" vertex="1">
+          <mxGeometry x="500" y="680" width="160" height="100" as="geometry" />
+        </mxCell>
+        <mxCell id="settings-display-detail" value="Settings Screen Display&lt;br&gt;Current set number&lt;br&gt;Parameter being edited&lt;br&gt;All current values&lt;br&gt;Edit indicators&lt;br&gt;Navigation prompts" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontSize=10" parent="1" vertex="1">
+          <mxGeometry x="385" y="820" width="160" height="100" as="geometry" />
+        </mxCell>
+        <mxCell id="arrow1" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;" parent="1" source="init-start" target="init-hardware" edge="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="arrow2" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;" parent="1" source="init-hardware" target="init-defaults" edge="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="arrow3" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;" parent="1" source="init-defaults" target="main-screen" edge="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="arrow4" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;" parent="1" source="main-screen" target="main-loop" edge="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="arrow5" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;" parent="1" source="main-loop" target="btn-handler" edge="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="arrow6" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;" parent="1" source="main-loop" target="pot-handler" edge="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="arrow7" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;" parent="1" source="main-loop" target="metronome-engine" edge="1">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="650" y="350" />
+              <mxPoint x="400" y="350" />
+              <mxPoint x="400" y="550" />
+              <mxPoint x="140" y="550" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="arrow8" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;" parent="1" source="main-loop" target="display-system" edge="1">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="650" y="350" />
+              <mxPoint x="400" y="350" />
+              <mxPoint x="400" y="680" />
+              <mxPoint x="140" y="680" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="arrow9" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;" parent="1" source="btn-handler" target="btn1-check" edge="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="arrow10" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=1;exitY=0.25;exitDx=0;exitDy=0;" parent="1" source="btn1-check" target="btn1-long-check" edge="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="arrow11" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;" parent="1" source="btn1-long-check" target="enter-settings" edge="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="arrow12" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=1;exitY=0.75;exitDx=0;exitDy=0;" parent="1" source="btn1-check" target="btn1-short" edge="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="arrow13" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;" parent="1" source="btn-handler" target="btn2-context" edge="1">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="890" y="340" />
+              <mxPoint x="1230" y="340" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="arrow14" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.5;exitY=0;exitDx=0;exitDy=0;" parent="1" source="btn2-context" target="btn2-settings" edge="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="arrow15" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;" parent="1" source="btn2-context" target="btn2-main" edge="1">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="1230" y="370" />
+              <mxPoint x="1390" y="370" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="arrow16" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;" parent="1" source="pot-handler" target="pot-settings-check" edge="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="arrow17" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;" parent="1" source="pot-settings-check" target="pot-adjust" edge="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="arrow18" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;" parent="1" source="metronome-engine" target="timing-calc" edge="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="arrow19" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;" parent="1" source="timing-calc" target="audio-output" edge="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="arrow20" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;" parent="1" source="audio-output" target="beat-tracking" edge="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="arrow21" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;" parent="1" source="beat-tracking" target="set-cycling" edge="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="arrow22" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;" parent="1" source="display-system" target="display-mode" edge="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="arrow23" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=1;exitY=0.25;exitDx=0;exitDy=0;" parent="1" source="display-mode" target="main-display" edge="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="arrow24" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=1;exitY=0.75;exitDx=0;exitDy=0;" parent="1" source="display-mode" target="settings-display-detail" edge="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="arrow25" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#FF6B6B;strokeWidth=2;dashed=1;" parent="1" source="set-cycling" target="main-loop" edge="1">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="890" y="530" />
+              <mxPoint x="1000" y="530" />
+              <mxPoint x="1000" y="420" />
+              <mxPoint x="780" y="420" />
+              <mxPoint x="780" y="270" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="arrow26" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#4ECDC4;strokeWidth=2;dashed=1;" parent="1" source="enter-settings" target="main-loop" edge="1">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="1400" y="40" />
+              <mxPoint x="800" y="40" />
+              <mxPoint x="800" y="200" />
+              <mxPoint x="650" y="200" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="arrow27" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#9B59B6;strokeWidth=2;dashed=1;" parent="1" source="btn2-main" target="main-loop" edge="1">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="1390" y="280" />
+              <mxPoint x="740" y="280" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="label-yes1" value="YES" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=9;fontColor=#00AA00;" parent="1" vertex="1">
+          <mxGeometry x="1290" y="95" width="30" height="15" as="geometry" />
+        </mxCell>
+        <mxCell id="label-no1" value="NO" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=9;fontColor=#CC0000;" parent="1" vertex="1">
+          <mxGeometry x="1150" y="195" width="30" height="15" as="geometry" />
+        </mxCell>
+        <mxCell id="label-settings" value="SETTINGS" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=9;fontColor=#2E86AB;" parent="1" vertex="1">
+          <mxGeometry x="1300" y="240" width="50" height="15" as="geometry" />
+        </mxCell>
+        <mxCell id="label-main" value="MAIN" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=9;fontColor=#A23B72;" parent="1" vertex="1">
+          <mxGeometry x="1300" y="340" width="40" height="15" as="geometry" />
+        </mxCell>
+        <mxCell id="label-yes2" value="YES" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=9;fontColor=#00AA00;" parent="1" vertex="1">
+          <mxGeometry x="1120" y="395" width="30" height="15" as="geometry" />
+        </mxCell>
+        <mxCell id="label-main-mode" value="MAIN" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=9;fontColor=#2E86AB;" parent="1" vertex="1">
+          <mxGeometry x="440" y="720" width="40" height="15" as="geometry" />
+        </mxCell>
+        <mxCell id="label-settings-mode" value="SETTINGS" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=9;fontColor=#A23B72;" parent="1" vertex="1">
+          <mxGeometry x="440" y="820" width="50" height="15" as="geometry" />
+        </mxCell>
+        <mxCell id="legend-title" value="LEGEND" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=12;fontStyle=1;" parent="1" vertex="1">
+          <mxGeometry x="60" y="940" width="80" height="20" as="geometry" />
+        </mxCell>
+        <mxCell id="legend1" value="System Initialization" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=10" parent="1" vertex="1">
+          <mxGeometry x="60" y="960" width="120" height="30" as="geometry" />
+        </mxCell>
+        <mxCell id="legend2" value="User Interface" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontSize=10" parent="1" vertex="1">
+          <mxGeometry x="200" y="960" width="120" height="30" as="geometry" />
+        </mxCell>
+        <mxCell id="legend3" value="Audio Processing" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d79b00;fontSize=10" parent="1" vertex="1">
+          <mxGeometry x="340" y="960" width="120" height="30" as="geometry" />
+        </mxCell>
+        <mxCell id="legend4" value="Control Logic" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontSize=10" parent="1" vertex="1">
+          <mxGeometry x="480" y="960" width="120" height="30" as="geometry" />
+        </mxCell>
+        <mxCell id="legend5" value="Decision Points" style="diamond;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=10" parent="1" vertex="1">
+          <mxGeometry x="620" y="960" width="100" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="legend6" value="Return Loops" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=10;fontColor=#666666;" parent="1" vertex="1">
+          <mxGeometry x="740" y="960" width="80" height="30" as="geometry" />
+        </mxCell>
+        <mxCell id="legend6-line" value="" style="endArrow=classic;html=1;rounded=0;strokeColor=#FF6B6B;strokeWidth=2;dashed=1;" parent="1" edge="1">
+          <mxGeometry width="50" height="50" relative="1" as="geometry">
+            <mxPoint x="740" y="990" as="sourcePoint" />
+            <mxPoint x="800" y="990" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="timing-feedback" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#FFA500;strokeWidth=1;dashed=1;" parent="1" source="timing-calc" target="metronome-engine" edge="1">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="330" y="680" />
+              <mxPoint x="140" y="680" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="timing-label" value="Continuous\nTiming Check" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=8;fontColor=#FFA500;" parent="1" vertex="1">
+          <mxGeometry x="190" y="655" width="60" height="25" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>
