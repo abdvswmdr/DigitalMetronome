@@ -3,11 +3,14 @@
 *.elf
 *.bin
 *.map
+*.org
+*.drawio
 
 # Build directories
 build/
 .build/
 documentation/
+flowcharts/
 
 # IDE specific files
 .vscode/
