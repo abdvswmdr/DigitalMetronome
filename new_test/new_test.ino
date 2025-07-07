@@ -1,56 +1,127 @@
 #include <U8g2lib.h>
 #include <Wire.h>
+#include <Preferences.h>
 
 // OLED Setup
 U8G2_SSD1306_128X32_UNIVISION_F_HW_I2C u8g2(U8G2_R0, /* reset=*/ U8X8_PIN_NONE, /* clock=*/ 5, /* data=*/ 4);
 
 // Pin Definitions
-const int BTN1 = 12;        // Mode/Set selection
-const int BTN2 = 15;         // Start/Stop
-const int POT = 34;          // Analog input
+const int BTN1 = 12;        // Menu/Back button
+const int BTN2 = 15;         // Play/Stop button
+const int ENCODER_CLK = 25;  // Rotary encoder Channel A
+const int ENCODER_DT = 26;   // Rotary encoder Channel B
+const int ENCODER_SW = 14;   // Rotary encoder push button
 const int SPEAKER = 19;      // Audio output
 
 // Preset Set Structure
 struct PresetSet {
+  String name;
   int bpm;
   int numerator;
   int denominator;
 };
 
+// Custom Set Structure for variable length sequences
+struct CustomSet {
+  String name;
+  int bpm;
+  int setCount;
+  int numerators[300];  // Max 300 time signatures
+  int denominators[300];
+};
+
 // State Variables
 enum State { 
-  SET_BPM, SET_NUMERATOR, SET_DENOMINATOR, 
-  SETTINGS_SET1, SETTINGS_SET2, SETTINGS_SET3, SETTINGS_SET4,
+  MAIN_MENU, PLAY_PRESETS_MENU, CREATE_NEW_MENU, SET_MANAGEMENT_MENU,
+  SET_BPM, SET_COUNT, SET_TIME_SIGNATURES,
   RUNNING, PAUSED 
 };
 
-State currentState = RUNNING;  // Start at main screen
-PresetSet presets[4] = {
-  {120, 4, 4},  // Set 1 default
-  {140, 2, 4},   // Set 2 default
-  {90, 3, 4},  // Set 3 default
-  {160, 4, 8}   // Set 4 default
+// Menu States
+enum MenuState {
+  MENU_MAIN, MENU_PLAY_PRESETS, MENU_CREATE_NEW, MENU_SET_MANAGEMENT
 };
 
-int currentSet = 0;         // Current active set (0-3)
-int editingSet = 0;         // Set being edited in settings (0-3)
-int settingParameter = 0;   // 0=BPM, 1=numerator, 2=denominator
+// Rotary Encoder Variables
+volatile int encoderPos = 0;
+volatile bool encoderChanged = false;
+int lastEncoderPos = 0;
+
+State currentState = MAIN_MENU;  // Start at main menu
+MenuState currentMenu = MENU_MAIN;
+int menuSelection = 0;
+
+// Factory Preset Sets (built-in)
+PresetSet factoryPresets[4] = {
+  {"Standard 4/4", 120, 4, 4},
+  {"Waltz 3/4", 90, 3, 4},
+  {"Energetic 2/4", 140, 2, 4},
+  {"Fast 4/8", 160, 4, 8}
+};
+
+// Current working set for creation/editing
+CustomSet workingSet;
+int currentTimeSignatureIndex = 0;
+int timeSignatureParam = 0; // 0=numerator, 1=denominator
+
+// EEPROM and preset management
+Preferences preferences;
+int maxCustomSets = 20;
+int customSetCount = 0;
+
+int currentSet = 0;         // Current active set index
+int playingSetType = 0;     // 0=factory, 1=custom
+int currentPlayingSet = 0;  // Index of currently playing set
 unsigned long lastBeat = 0;
 int beatCount = 0;
 bool beatIndicator = false;
-unsigned long setStartTime = 0;
-int measuresInCurrentSet = 0;
-const int MEASURES_PER_SET = 16; // 4 measures per set
+// Removed unused variables: setStartTime, measuresInCurrentSet
 
 // Button tracking
 unsigned long btn1PressTime = 0;
 bool longPressActive = false;
 bool btn2Pressed = false;
-int lastPotValue = -1;
+unsigned long btn2PressTime = 0;
+bool btn2LongPress = false;
+bool encoderButtonPressed = false;
+unsigned long encoderButtonPressTime = 0;
+bool encoderButtonLongPress = false;
+
+// Rotary Encoder Interrupt Service Routine
+void IRAM_ATTR encoderISR() {
+  static unsigned long lastInterruptTime = 0;
+  unsigned long interruptTime = millis();
+  
+  // Debounce - ignore if too soon
+  if (interruptTime - lastInterruptTime < 5) return;
+  
+  // Read both pins
+  bool clkState = digitalRead(ENCODER_CLK);
+  bool dtState = digitalRead(ENCODER_DT);
+  
+  // Determine direction
+  if (clkState != dtState) {
+    encoderPos++;  // Clockwise
+  } else {
+    encoderPos--;  // Counter-clockwise
+  }
+  
+  encoderChanged = true;
+  lastInterruptTime = interruptTime;
+}
 
 void setup() {
+  // Initialize button pins
   pinMode(BTN1, INPUT_PULLUP);
   pinMode(BTN2, INPUT_PULLUP);
+  
+  // Initialize rotary encoder pins
+  pinMode(ENCODER_CLK, INPUT_PULLUP);
+  pinMode(ENCODER_DT, INPUT_PULLUP);
+  pinMode(ENCODER_SW, INPUT_PULLUP);
+  
+  // Attach interrupt for rotary encoder
+  attachInterrupt(digitalPinToInterrupt(ENCODER_CLK), encoderISR, CHANGE);
   
   // Initialize I2C with explicit pins
   Wire.begin(4, 5); // SDA=4, SCL=5
@@ -58,244 +129,628 @@ void setup() {
   // PWM setup for speaker
   ledcAttach(SPEAKER, 1000, 8); // Pin, frequency, resolution
   
+  // Initialize preferences for EEPROM
+  preferences.begin("metronome", false);
+  
   u8g2.begin();
   Serial.begin(115200);
+  
+  // Initialize working set
+  workingSet.name = "New Set";
+  workingSet.bpm = 120;
+  workingSet.setCount = 1;
+  workingSet.numerators[0] = 4;
+  workingSet.denominators[0] = 4;
+  
+  // Load custom set count from EEPROM
+  customSetCount = preferences.getInt("customCount", 0);
   
   // Initial display test
   u8g2.clearBuffer();
   u8g2.setFont(u8g2_font_profont12_tf);
-  u8g2.drawStr(0, 12, "Metronome Ready");
+  u8g2.drawStr(0, 12, "Enhanced Metronome");
+  u8g2.drawStr(0, 22, "v2.0 - Encoder Ready");
   u8g2.sendBuffer();
   
-  Serial.println("System initialized");
-  delay(1000);
+  Serial.println("Enhanced Metronome System initialized");
+  delay(2000);
 }
 
 void loop() {
   handleButtons();
   handleMetronome();
   updateDisplay();
+  delay(10); // Small delay to prevent overwhelming the system
 }
 
 void handleButtons() {
-  // Button 1 - Mode/Set selection
+  handleEncoderButton();
+  handleBtn1();
+  handleBtn2();
+  handleEncoderRotation();
+}
+
+void handleEncoderButton() {
+  bool currentPressed = (digitalRead(ENCODER_SW) == LOW);
+  
+  if (currentPressed && !encoderButtonPressed) {
+    encoderButtonPressTime = millis();
+  }
+  
+  if (currentPressed && millis() - encoderButtonPressTime > 1000) {
+    encoderButtonLongPress = true;
+  }
+  
+  if (!currentPressed && encoderButtonPressed) {
+    if (encoderButtonLongPress) {
+      // Long press actions
+      Serial.println("Encoder long press");
+    } else {
+      // Short press actions - Select/Confirm
+      handleEncoderSelect();
+    }
+    encoderButtonLongPress = false;
+  }
+  encoderButtonPressed = currentPressed;
+}
+
+void handleBtn1() {
+  // BTN1 - Menu/Back button
   if (digitalRead(BTN1) == LOW) {
     if (btn1PressTime == 0) btn1PressTime = millis();
     
-    // Long press detection (>2s) - Enter settings mode
     if (!longPressActive && millis() - btn1PressTime > 2000) {
       longPressActive = true;
-      if (currentState == RUNNING || currentState == PAUSED) {
-        currentState = SETTINGS_SET1;
-        editingSet = 0;
-        settingParameter = 0;
-        Serial.println("Settings mode - Set 1");
-      }
+      handleBtn1LongPress();
     }
-  } 
-  else {
+  } else {
     if (btn1PressTime > 0) {
-      // Short press action - cycle parameters in settings
       if (!longPressActive) {
-        if (currentState >= SETTINGS_SET1 && currentState <= SETTINGS_SET4) {
-          settingParameter = (settingParameter + 1) % 3;
-          Serial.print("Parameter: ");
-          Serial.println(settingParameter == 0 ? "BPM" : (settingParameter == 1 ? "Numerator" : "Denominator"));
-        }
+        handleBtn1ShortPress();
       }
       btn1PressTime = 0;
       longPressActive = false;
     }
   }
+}
 
-  // Button 2 - Context dependent
-  bool btn2Current = (digitalRead(BTN2) == LOW);
-  bool btn2LongPress = false;
-  static unsigned long btn2PressTime = 0;
+void handleBtn2() {
+  // BTN2 - Play/Stop button
+  bool currentPressed = (digitalRead(BTN2) == LOW);
   
-  if (btn2Current && !btn2Pressed) {
+  if (currentPressed && !btn2Pressed) {
     btn2PressTime = millis();
   }
   
-  if (btn2Current && millis() - btn2PressTime > 2000) {
+  if (currentPressed && millis() - btn2PressTime > 2000) {
     btn2LongPress = true;
   }
   
-  if (!btn2Current && btn2Pressed) {  // Button released
-    if (currentState >= SETTINGS_SET1 && currentState <= SETTINGS_SET4) {
-      if (btn2LongPress) {
-        // Long press - exit settings and return to main
-        currentState = RUNNING;
-        currentSet = 0;
-        measuresInCurrentSet = 0;
-        beatCount = 0;
-        lastBeat = millis();
-        Serial.println("Exiting settings - Starting playback");
-      } else {
-        // Short press - save current set and move to next
-        Serial.print("Set ");
-        Serial.print(editingSet + 1);
-        Serial.println(" saved");
-        
-        editingSet++;
-        if (editingSet < 4) {
-          currentState = (State)(SETTINGS_SET1 + editingSet);
-          settingParameter = 0;
-        } else {
-          // All sets configured, start playback
-          currentState = RUNNING;
-          currentSet = 0;
-          measuresInCurrentSet = 0;
-          beatCount = 0;
-          lastBeat = millis();
-          Serial.println("All sets configured - Starting playback");
-        }
-      }
+  if (!currentPressed && btn2Pressed) {
+    if (btn2LongPress) {
+      handleBtn2LongPress();
     } else {
-      // Main screen - start/stop toggle
-      if (currentState == RUNNING) {
-        currentState = PAUSED;
-      } else {
-        currentState = RUNNING;
-        measuresInCurrentSet = 0;
-        beatCount = 0;
-        lastBeat = millis();
-      }
+      handleBtn2ShortPress();
+    }
+    btn2LongPress = false;
+  }
+  btn2Pressed = currentPressed;
+}
+
+void handleEncoderRotation() {
+  if (encoderChanged) {
+    encoderChanged = false;
+    int change = encoderPos - lastEncoderPos;
+    lastEncoderPos = encoderPos;
+    
+    if (change != 0) {
+      processEncoderChange(change);
     }
   }
-  btn2Pressed = btn2Current;
-  
-  // Potentiometer value handling
-  int potValue = analogRead(POT);
-  
-  if (currentState >= SETTINGS_SET1 && currentState <= SETTINGS_SET4) {
-    // In settings mode - adjust current parameter of current set
-    if (settingParameter == 0) {  // BPM
-      presets[editingSet].bpm = map(potValue, 0, 4095, 40, 240);
-    } 
-    else if (settingParameter == 1) {  // Numerator
-      presets[editingSet].numerator = map(potValue, 0, 4095, 1, 8);
-    }
-    else if (settingParameter == 2) {  // Denominator
-      int denomIndex = map(potValue, 0, 4095, 0, 3);
-      switch(denomIndex) {
-        case 0: presets[editingSet].denominator = 1; break;
-        case 1: presets[editingSet].denominator = 2; break;
-        case 2: presets[editingSet].denominator = 4; break;
-        case 3: presets[editingSet].denominator = 8; break;
-      }
-    }
+}
+
+void processEncoderChange(int change) {
+  switch (currentState) {
+    case MAIN_MENU:
+      navigateMenu(change);
+      break;
+    case PLAY_PRESETS_MENU:
+      navigatePlayPresets(change);
+      break;
+    case SET_BPM:
+      adjustBPM(change);
+      break;
+    case SET_COUNT:
+      adjustSetCount(change);
+      break;
+    case SET_TIME_SIGNATURES:
+      adjustTimeSignature(change);
+      break;
+    default:
+      break;
   }
+}
+
+void handleEncoderSelect() {
+  switch (currentState) {
+    case MAIN_MENU:
+      selectMainMenuItem();
+      break;
+    case PLAY_PRESETS_MENU:
+      selectPresetToPlay();
+      break;
+    case SET_BPM:
+      confirmBPM();
+      break;
+    case SET_COUNT:
+      confirmSetCount();
+      break;
+    case SET_TIME_SIGNATURES:
+      confirmTimeSignature();
+      break;
+    default:
+      break;
+  }
+}
+
+void handleBtn1ShortPress() {
+  // Menu/Back functionality
+  switch (currentState) {
+    case RUNNING:
+    case PAUSED:
+      currentState = MAIN_MENU;
+      menuSelection = 0;
+      break;
+    case PLAY_PRESETS_MENU:
+    case CREATE_NEW_MENU:
+    case SET_MANAGEMENT_MENU:
+      currentState = MAIN_MENU;
+      menuSelection = 0;
+      break;
+    case SET_BPM:
+    case SET_COUNT:
+    case SET_TIME_SIGNATURES:
+      currentState = MAIN_MENU;
+      menuSelection = 0;
+      break;
+    default:
+      break;
+  }
+}
+
+void handleBtn1LongPress() {
+  // Quick access to main menu from any state
+  currentState = MAIN_MENU;
+  menuSelection = 0;
+}
+
+void handleBtn2ShortPress() {
+  // Play/Stop functionality
+  if (currentState == RUNNING) {
+    currentState = PAUSED;
+  } else if (currentState == PAUSED) {
+    currentState = RUNNING;
+    lastBeat = millis();
+  }
+}
+
+void handleBtn2LongPress() {
+  // Quick create mode - immediate custom set creation
+  currentState = SET_BPM;
+  workingSet.bpm = 120;
+  workingSet.setCount = 1;
+  workingSet.numerators[0] = 4;
+  workingSet.denominators[0] = 4;
+  Serial.println("Quick create mode - Set BPM");
 }
 
 void handleMetronome() {
   if (currentState != RUNNING) return;
   
-  // Use current preset values
-  PresetSet& current = presets[currentSet];
-  unsigned long interval = 60000 / current.bpm;
+  // Determine current playing set based on type
+  int currentBPM, currentNumerator, currentDenominator;
+  
+  if (playingSetType == 0) { // Factory preset
+    currentBPM = factoryPresets[currentSet].bpm;
+    currentNumerator = factoryPresets[currentSet].numerator;
+    currentDenominator = factoryPresets[currentSet].denominator;
+  } else { // Custom set
+    currentBPM = workingSet.bpm;
+    currentNumerator = workingSet.numerators[currentSet];
+    currentDenominator = workingSet.denominators[currentSet];
+  }
+  
+  unsigned long interval = 60000 / currentBPM;
   
   if (millis() - lastBeat >= interval) {
     // Generate sound with higher frequency for better audibility  
-    ledcWriteTone(SPEAKER, 4500); // 3500Hz tone for piezo buzzer
-    delay(20);                    // 100ms duration
-    ledcWrite(SPEAKER, 0);         // Stop sound
+    ledcWriteTone(SPEAKER, 4500);
+    delay(20);
+    ledcWrite(SPEAKER, 0);
     
     beatIndicator = !beatIndicator;
     lastBeat = millis();
-    beatCount = (beatCount % current.numerator) + 1;
+    beatCount = (beatCount % currentNumerator) + 1;
     
-    // Check if we completed a measure
+    // Check if we completed a measure - seamless transition
     if (beatCount == 1) { // Just started new measure
-      measuresInCurrentSet++;
-      if (measuresInCurrentSet >= MEASURES_PER_SET) {
+      if (playingSetType == 0) {
+        // Factory preset cycling
         currentSet = (currentSet + 1) % 4;
-        measuresInCurrentSet = 0;
-        Serial.print("Switching to Set ");
-        Serial.println(currentSet + 1);
+      } else {
+        // Custom set progression
+        currentSet = (currentSet + 1) % workingSet.setCount;
       }
+      Serial.print("Switching to Set ");
+      Serial.println(currentSet + 1);
     }
   }
+}
+
+// Menu Navigation Functions
+void navigateMenu(int change) {
+  switch (currentState) {
+    case MAIN_MENU:
+      menuSelection = constrain(menuSelection + change, 0, 3);
+      break;
+    case PLAY_PRESETS_MENU:
+      menuSelection = constrain(menuSelection + change, 0, 3 + customSetCount);
+      break;
+    default:
+      break;
+  }
+}
+
+void navigatePlayPresets(int change) {
+  menuSelection = constrain(menuSelection + change, 0, 3 + customSetCount);
+}
+
+void selectMainMenuItem() {
+  switch (menuSelection) {
+    case 0: // Play Presets
+      currentState = PLAY_PRESETS_MENU;
+      menuSelection = 0;
+      break;
+    case 1: // Create New Set
+      currentState = SET_BPM;
+      workingSet.bpm = 120;
+      workingSet.setCount = 1;
+      workingSet.numerators[0] = 4;
+      workingSet.denominators[0] = 4;
+      break;
+    case 2: // Set Management
+      currentState = SET_MANAGEMENT_MENU;
+      menuSelection = 0;
+      break;
+    case 3: // Quick Play (Last Used)
+      startPlayback();
+      break;
+  }
+}
+
+void selectPresetToPlay() {
+  if (menuSelection < 4) {
+    // Factory preset selected
+    playingSetType = 0;
+    currentSet = menuSelection;
+    startPlayback();
+  } else {
+    // Custom set selected
+    playingSetType = 1;
+    currentSet = 0;
+    loadCustomSet(menuSelection - 4);
+    startPlayback();
+  }
+}
+
+void adjustBPM(int change) {
+  workingSet.bpm = constrain(workingSet.bpm + change, 40, 240);
+}
+
+void adjustSetCount(int change) {
+  workingSet.setCount = constrain(workingSet.setCount + change, 1, 300);
+}
+
+void adjustTimeSignature(int change) {
+  if (change > 0) {
+    // Clockwise - adjust numerator
+    workingSet.numerators[currentTimeSignatureIndex]++;
+    if (workingSet.numerators[currentTimeSignatureIndex] > 16) {
+      workingSet.numerators[currentTimeSignatureIndex] = 1;
+    }
+  } else {
+    // Counter-clockwise - adjust denominator with looping
+    int currentDenom = workingSet.denominators[currentTimeSignatureIndex];
+    switch (currentDenom) {
+      case 2: workingSet.denominators[currentTimeSignatureIndex] = 16; break;
+      case 4: workingSet.denominators[currentTimeSignatureIndex] = 2; break;
+      case 8: workingSet.denominators[currentTimeSignatureIndex] = 4; break;
+      case 16: workingSet.denominators[currentTimeSignatureIndex] = 8; break;
+      default: workingSet.denominators[currentTimeSignatureIndex] = 4; break;
+    }
+  }
+}
+
+void confirmBPM() {
+  currentState = SET_COUNT;
+  Serial.print("BPM set to: ");
+  Serial.println(workingSet.bpm);
+}
+
+void confirmSetCount() {
+  currentState = SET_TIME_SIGNATURES;
+  currentTimeSignatureIndex = 0;
+  // Initialize all time signatures with default values
+  for (int i = 0; i < workingSet.setCount; i++) {
+    workingSet.numerators[i] = 4;
+    workingSet.denominators[i] = 4;
+  }
+  Serial.print("Set count: ");
+  Serial.println(workingSet.setCount);
+}
+
+void confirmTimeSignature() {
+  currentTimeSignatureIndex++;
+  if (currentTimeSignatureIndex >= workingSet.setCount) {
+    // All time signatures set, auto-save and play
+    if (customSetCount < maxCustomSets) {
+      saveCustomSet(customSetCount);
+      Serial.println("Set saved automatically.");
+    }
+    currentSet = 0;
+    playingSetType = 1;
+    startPlayback();
+  }
+}
+
+void startPlayback() {
+  currentState = RUNNING;
+  beatCount = 0;
+  lastBeat = millis();
+  Serial.println("Starting playback");
+}
+
+void loadCustomSet(int index) {
+  // Load custom set from EEPROM
+  String key = "set_" + String(index);
+  // Implementation depends on how we store custom sets
 }
 
 void updateDisplay() {
   u8g2.clearBuffer();
   
-  if (currentState >= SETTINGS_SET1 && currentState <= SETTINGS_SET4) {
-    // Settings mode display
-    u8g2.setFont(u8g2_font_6x10_tf);
-    
-    // Show which set we're editing
-    char setStr[10];
-    sprintf(setStr, "SET %d", editingSet + 1);
-    u8g2.drawStr(2, 10, setStr);
-    
-    // Show current parameter being edited
-    const char* paramNames[] = {"BPM", "BEATS", "NOTE"};
-    u8g2.drawStr(60, 10, paramNames[settingParameter]);
-    
-    // Show current values
-    PresetSet& editSet = presets[editingSet];
-    
-    // BPM
-    char bpmStr[10];
-    sprintf(bpmStr, "BPM:%d", editSet.bpm);
-    u8g2.drawStr(2, 20, bpmStr);
-    if (settingParameter == 0) u8g2.drawStr(45, 20, "<");
-    
-    // Time signature
-    char timeSigStr[15];
-    sprintf(timeSigStr, "SIG:%d/%d", editSet.numerator, editSet.denominator);
-    u8g2.drawStr(2, 30, timeSigStr);
-    if (settingParameter == 1) u8g2.drawStr(25, 30, "<");
-    if (settingParameter == 2) u8g2.drawStr(35, 30, "<");
-    
-  } else {
-    // Main screen display
-    PresetSet& current = presets[currentSet];
-    
-    // Top row: Beat indicator and current set
-    if (currentState == RUNNING) {
-      u8g2.drawDisc(8, 8, beatIndicator ? 5 : 2);
-    } else {
-      u8g2.drawCircle(8, 8, 2);
-    }
-    
-    // Show current set number
-    u8g2.setFont(u8g2_font_6x10_tf);
-    char setStr[8];
-    sprintf(setStr, "S%d", currentSet + 1);
-    u8g2.drawStr(20, 10, setStr);
-    
-    // Time signature
-    char timeSigStr[8];
-    sprintf(timeSigStr, "%d/%d", current.numerator, current.denominator);
-    u8g2.drawStr(100, 10, timeSigStr);
-    
-    // Center: Large BPM value
-    char bpmStr[10];
-    sprintf(bpmStr, "%d", current.bpm);
-    u8g2.setFont(u8g2_font_logisoso16_tn);
-    int bpmWidth = u8g2.getStrWidth(bpmStr);
-    u8g2.drawStr(64 - bpmWidth/2, 20, bpmStr);
-    
-    // BPM label
-    u8g2.setFont(u8g2_font_5x7_tf);
-    u8g2.drawStr(64 - 10, 28, "BPM");
-    
-    // Bottom row: State and beat count
-    switch(currentState) {
-      case RUNNING: 
-        u8g2.drawStr(2, 32, "PLAYING");
-        char beatStr[8];
-        sprintf(beatStr, "%d/%d", beatCount, current.numerator);
-        u8g2.drawStr(90, 32, beatStr);
-        break;
-      case PAUSED: 
-        u8g2.drawStr(2, 32, "PAUSED"); 
-        break;
-    }
+  switch (currentState) {
+    case MAIN_MENU:
+      displayMainMenu();
+      break;
+    case PLAY_PRESETS_MENU:
+      displayPlayPresetsMenu();
+      break;
+    case SET_BPM:
+      displayBPMSetting();
+      break;
+    case SET_COUNT:
+      displaySetCountSetting();
+      break;
+    case SET_TIME_SIGNATURES:
+      displayTimeSignatureSetting();
+      break;
+    case RUNNING:
+    case PAUSED:
+      displayPlayback();
+      break;
+    default:
+      break;
   }
   
   u8g2.sendBuffer();
+}
+
+void displayMainMenu() {
+  u8g2.setFont(u8g2_font_6x10_tf);
+  u8g2.drawStr(0, 10, "MAIN MENU");
+  
+  const char* menuItems[] = {"Play Presets", "Create New", "Manage Sets", "Quick Play"};
+  
+  for (int i = 0; i < 4; i++) {
+    if (i == menuSelection) {
+      u8g2.drawStr(0, 20 + i * 8, "> ");
+    }
+    u8g2.drawStr(12, 20 + i * 8, menuItems[i]);
+  }
+}
+
+void displayPlayPresetsMenu() {
+  u8g2.setFont(u8g2_font_6x10_tf);
+  u8g2.drawStr(0, 10, "SELECT PRESET");
+  
+  // Show factory presets
+  for (int i = 0; i < 4; i++) {
+    if (i == menuSelection) {
+      u8g2.drawStr(0, 20 + i * 5, "> ");
+    }
+    u8g2.drawStr(12, 20 + i * 5, factoryPresets[i].name.c_str());
+  }
+  
+  // Show custom sets (if any)
+  // Implementation depends on custom set storage
+}
+
+void displayBPMSetting() {
+  u8g2.setFont(u8g2_font_6x10_tf);
+  u8g2.drawStr(0, 10, "SET BPM");
+  
+  char bpmStr[20];
+  sprintf(bpmStr, "BPM: %d", workingSet.bpm);
+  u8g2.setFont(u8g2_font_logisoso16_tn);
+  u8g2.drawStr(10, 25, bpmStr);
+  
+  u8g2.setFont(u8g2_font_5x7_tf);
+  u8g2.drawStr(0, 32, "Rotate to adjust");
+}
+
+void displaySetCountSetting() {
+  u8g2.setFont(u8g2_font_6x10_tf);
+  u8g2.drawStr(0, 10, "SET COUNT");
+  
+  char countStr[20];
+  sprintf(countStr, "Count: %d", workingSet.setCount);
+  u8g2.setFont(u8g2_font_logisoso16_tn);
+  u8g2.drawStr(10, 25, countStr);
+  
+  u8g2.setFont(u8g2_font_5x7_tf);
+  u8g2.drawStr(0, 32, "Rotate to adjust");
+}
+
+void displayTimeSignatureSetting() {
+  u8g2.setFont(u8g2_font_6x10_tf);
+  char headerStr[20];
+  sprintf(headerStr, "SET %d/%d", currentTimeSignatureIndex + 1, workingSet.setCount);
+  u8g2.drawStr(0, 10, headerStr);
+  
+  char timeSigStr[20];
+  sprintf(timeSigStr, "%d/%d", workingSet.numerators[currentTimeSignatureIndex], workingSet.denominators[currentTimeSignatureIndex]);
+  u8g2.setFont(u8g2_font_logisoso16_tn);
+  u8g2.drawStr(30, 25, timeSigStr);
+  
+  u8g2.setFont(u8g2_font_5x7_tf);
+  u8g2.drawStr(0, 32, "CW:beats CCW:note");
+}
+
+void displayPlayback() {
+  // Determine current playing values
+  int currentBPM, currentNumerator, currentDenominator;
+  String setName;
+  
+  if (playingSetType == 0) {
+    currentBPM = factoryPresets[currentSet].bpm;
+    currentNumerator = factoryPresets[currentSet].numerator;
+    currentDenominator = factoryPresets[currentSet].denominator;
+    setName = factoryPresets[currentSet].name;
+  } else {
+    currentBPM = workingSet.bpm;
+    currentNumerator = workingSet.numerators[currentSet];
+    currentDenominator = workingSet.denominators[currentSet];
+    setName = workingSet.name;
+  }
+  
+  // Beat indicator
+  if (currentState == RUNNING) {
+    u8g2.drawDisc(8, 8, beatIndicator ? 5 : 2);
+  } else {
+    u8g2.drawCircle(8, 8, 2);
+  }
+  
+  // Set name/number
+  u8g2.setFont(u8g2_font_6x10_tf);
+  char setStr[10];
+  sprintf(setStr, "S%d", currentSet + 1);
+  u8g2.drawStr(20, 10, setStr);
+  
+  // Time signature
+  char timeSigStr[8];
+  sprintf(timeSigStr, "%d/%d", currentNumerator, currentDenominator);
+  u8g2.drawStr(100, 10, timeSigStr);
+  
+  // BPM
+  char bpmStr[10];
+  sprintf(bpmStr, "%d", currentBPM);
+  u8g2.setFont(u8g2_font_logisoso16_tn);
+  int bpmWidth = u8g2.getStrWidth(bpmStr);
+  u8g2.drawStr(64 - bpmWidth/2, 20, bpmStr);
+  
+  u8g2.setFont(u8g2_font_5x7_tf);
+  u8g2.drawStr(64 - 10, 28, "BPM");
+  
+  // Status and beat count
+  switch(currentState) {
+    case RUNNING: 
+      u8g2.drawStr(2, 32, "PLAYING");
+      char beatStr[8];
+      sprintf(beatStr, "%d/%d", beatCount, currentNumerator);
+      u8g2.drawStr(90, 32, beatStr);
+      break;
+    case PAUSED: 
+      u8g2.drawStr(2, 32, "PAUSED"); 
+      break;
+  }
+}
+
+// EEPROM Preset Management Functions
+void saveCustomSet(int index) {
+  String baseKey = "set_" + String(index);
+  
+  preferences.putString((baseKey + "_name").c_str(), workingSet.name);
+  preferences.putInt((baseKey + "_bpm").c_str(), workingSet.bpm);
+  preferences.putInt((baseKey + "_count").c_str(), workingSet.setCount);
+  
+  // Save time signatures
+  for (int i = 0; i < workingSet.setCount; i++) {
+    preferences.putInt((baseKey + "_num_" + String(i)).c_str(), workingSet.numerators[i]);
+    preferences.putInt((baseKey + "_den_" + String(i)).c_str(), workingSet.denominators[i]);
+  }
+  
+  // Update custom set count if this is a new set
+  if (index >= customSetCount) {
+    customSetCount = index + 1;
+    preferences.putInt("customCount", customSetCount);
+  }
+  
+  Serial.print("Custom set saved: ");
+  Serial.println(workingSet.name);
+}
+
+void loadCustomSet(int index) {
+  String baseKey = "set_" + String(index);
+  
+  workingSet.name = preferences.getString((baseKey + "_name").c_str(), "Custom Set");
+  workingSet.bpm = preferences.getInt((baseKey + "_bpm").c_str(), 120);
+  workingSet.setCount = preferences.getInt((baseKey + "_count").c_str(), 1);
+  
+  // Load time signatures
+  for (int i = 0; i < workingSet.setCount; i++) {
+    workingSet.numerators[i] = preferences.getInt((baseKey + "_num_" + String(i)).c_str(), 4);
+    workingSet.denominators[i] = preferences.getInt((baseKey + "_den_" + String(i)).c_str(), 4);
+  }
+  
+  Serial.print("Custom set loaded: ");
+  Serial.println(workingSet.name);
+}
+
+void deleteCustomSet(int index) {
+  String baseKey = "set_" + String(index);
+  
+  preferences.remove((baseKey + "_name").c_str());
+  preferences.remove((baseKey + "_bpm").c_str());
+  preferences.remove((baseKey + "_count").c_str());
+  
+  // Remove time signatures
+  for (int i = 0; i < 300; i++) {
+    preferences.remove((baseKey + "_num_" + String(i)).c_str());
+    preferences.remove((baseKey + "_den_" + String(i)).c_str());
+  }
+  
+  // Shift remaining sets down
+  for (int i = index; i < customSetCount - 1; i++) {
+    loadCustomSet(i + 1);
+    saveCustomSet(i);
+  }
+  
+  customSetCount--;
+  preferences.putInt("customCount", customSetCount);
+  
+  Serial.print("Custom set deleted: ");
+  Serial.println(index);
+}
+
+bool hasCustomSet(int index) {
+  if (index >= customSetCount) return false;
+  String baseKey = "set_" + String(index);
+  return preferences.isKey((baseKey + "_name").c_str());
+}
+
+String getCustomSetName(int index) {
+  if (!hasCustomSet(index)) return "";
+  String baseKey = "set_" + String(index);
+  return preferences.getString((baseKey + "_name").c_str(), "Custom Set");
 }
