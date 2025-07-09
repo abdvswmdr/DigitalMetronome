@@ -66,7 +66,7 @@ int timeSignatureParam = 0; // 0=numerator, 1=denominator
 
 // EEPROM and preset management
 Preferences preferences;
-int maxCustomSets = 20;
+int maxCustomSets = 50;
 int customSetCount = 0;
 
 int currentSet = 0;         // Current active set index
@@ -151,6 +151,9 @@ void setup() {
   
   // Load custom set count from EEPROM
   customSetCount = preferences.getInt("customCount", 0);
+  
+  // Create "654321" piano piece custom set if it doesn't exist
+  create654321Set();
   
   // Initial display test
   u8g2.clearBuffer();
@@ -429,7 +432,9 @@ void navigateMenu(int change) {
 }
 
 void navigatePlayPresets(int change) {
-  menuSelection = constrain(menuSelection + change, 0, 3 + customSetCount);
+  // Total items: 4 factory presets + custom sets
+  int totalItems = 4 + customSetCount;
+  menuSelection = constrain(menuSelection + change, 0, totalItems - 1);
 }
 
 void selectMainMenuItem() {
@@ -456,17 +461,42 @@ void selectMainMenuItem() {
 }
 
 void selectPresetToPlay() {
-  if (menuSelection < 4) {
-    // Factory preset selected
+  // Check if 654321 P1 exists and adjust menu logic
+  bool found654321 = false;
+  int set654321Index = -1;
+  for (int i = 0; i < customSetCount; i++) {
+    if (getCustomSetName(i) == "654321 P1") {
+      found654321 = true;
+      set654321Index = i;
+      break;
+    }
+  }
+  
+  if (found654321 && menuSelection == 0) {
+    // First item is 654321 P1
+    playingSetType = 1;
+    currentSet = 0;
+    loadCustomSet(set654321Index);
+    startPlayback();
+  } else if (found654321 && menuSelection >= 1 && menuSelection <= 4) {
+    // Factory presets (shifted by 1 if 654321 exists)
+    playingSetType = 0;
+    currentSet = menuSelection - 1;
+    startPlayback();
+  } else if (!found654321 && menuSelection < 4) {
+    // Factory presets (no 654321, normal order)
     playingSetType = 0;
     currentSet = menuSelection;
     startPlayback();
   } else {
-    // Custom set selected
+    // Other custom sets
     playingSetType = 1;
     currentSet = 0;
-    loadCustomSet(menuSelection - 4);
-    startPlayback();
+    int customIndex = found654321 ? menuSelection - 5 : menuSelection - 4;
+    if (customIndex >= 0 && customIndex < customSetCount) {
+      loadCustomSet(customIndex);
+      startPlayback();
+    }
   }
 }
 
@@ -592,10 +622,27 @@ void displayPlayPresetsMenu() {
   u8g2.setFont(u8g2_font_4x6_tf);
   u8g2.drawStr(0, 8, "SELECT PRESET");
   
-  // Show factory presets first
+  // Show "654321 P1" first if it exists
+  int displayIndex = 0;
+  bool found654321 = false;
+  for (int i = 0; i < customSetCount; i++) {
+    if (getCustomSetName(i) == "654321 P1") {
+      int y = 16 + displayIndex * 6;
+      if (displayIndex == menuSelection) {
+        u8g2.drawStr(0, y, "> ");
+      }
+      u8g2.drawStr(8, y, "654321 P1");
+      displayIndex++;
+      found654321 = true;
+      break;
+    }
+  }
+  
+  // Show factory presets
   for (int i = 0; i < 4; i++) {
-    int y = 16 + i * 6;
-    if (i == menuSelection) {
+    int y = 16 + displayIndex * 6;
+    int menuIndex = displayIndex + (found654321 ? 0 : 0);
+    if (menuIndex == menuSelection) {
       u8g2.drawStr(0, y, "> ");
     }
     // Truncate long names to fit screen
@@ -604,22 +651,25 @@ void displayPlayPresetsMenu() {
       name = name.substring(0, 15);
     }
     u8g2.drawStr(8, y, name.c_str());
+    displayIndex++;
   }
   
-  // Show custom sets if any exist
+  // Show other custom sets if any exist
   if (customSetCount > 0) {
-    u8g2.drawStr(64, 16, "CUSTOM:");
-    for (int i = 0; i < min(customSetCount, 3); i++) {
-      int customIndex = i + 4;
-      int y = 22 + i * 6;
-      if (customIndex == menuSelection) {
-        u8g2.drawStr(64, y, "> ");
-      }
+    for (int i = 0; i < min(customSetCount, 2); i++) {
       String customName = getCustomSetName(i);
-      if (customName.length() > 7) {
-        customName = customName.substring(0, 7);
+      if (customName != "654321 P1") { // Skip 654321 since we showed it first
+        int y = 16 + displayIndex * 6;
+        int customIndex = displayIndex;
+        if (customIndex == menuSelection) {
+          u8g2.drawStr(0, y, "> ");
+        }
+        if (customName.length() > 15) {
+          customName = customName.substring(0, 15);
+        }
+        u8g2.drawStr(8, y, customName.c_str());
+        displayIndex++;
       }
-      u8g2.drawStr(72, y, customName.c_str());
     }
   }
 }
@@ -801,4 +851,40 @@ String getCustomSetName(int index) {
   if (!hasCustomSet(index)) return "";
   String baseKey = "set_" + String(index);
   return preferences.getString((baseKey + "_name").c_str(), "Custom Set");
+}
+
+// Create the "654321" piano piece custom set
+void create654321Set() {
+  // Check if "654321" set already exists
+  bool exists = false;
+  for (int i = 0; i < customSetCount; i++) {
+    if (getCustomSetName(i) == "654321 P1") {
+      exists = true;
+      break;
+    }
+  }
+  
+  if (!exists && customSetCount < maxCustomSets) {
+    // Create the custom set
+    CustomSet set654321;
+    set654321.name = "654321 P1";
+    set654321.bpm = 200;
+    set654321.setCount = 6;
+    
+    // Time signatures: 6/8, 5/8, 4/8, 3/8, 2/8, 1/8
+    set654321.numerators[0] = 6; set654321.denominators[0] = 8;
+    set654321.numerators[1] = 5; set654321.denominators[1] = 8;
+    set654321.numerators[2] = 4; set654321.denominators[2] = 8;
+    set654321.numerators[3] = 3; set654321.denominators[3] = 8;
+    set654321.numerators[4] = 2; set654321.denominators[4] = 8;
+    set654321.numerators[5] = 1; set654321.denominators[5] = 8;
+    
+    // Save to EEPROM
+    CustomSet tempWorking = workingSet; // Backup current working set
+    workingSet = set654321; // Set our custom set as working
+    saveCustomSet(customSetCount); // Save it
+    workingSet = tempWorking; // Restore working set
+    
+    Serial.println("Created 654321 piano piece custom set");
+  }
 }
