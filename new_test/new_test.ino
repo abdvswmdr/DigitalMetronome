@@ -26,8 +26,8 @@ struct CustomSet {
   String name;
   int bpm;
   int setCount;
-  int numerators[300];  // Max 300 time signatures
-  int denominators[300];
+  int numerators[16];  // Max 16 time signatures
+  int denominators[16];
 };
 
 // State Variables
@@ -87,6 +87,13 @@ bool encoderButtonPressed = false;
 unsigned long encoderButtonPressTime = 0;
 bool encoderButtonLongPress = false;
 
+// Audio tone management
+unsigned long toneStartTime = 0;
+bool toneActive = false;
+const unsigned long TONE_DURATION = 20; // milliseconds
+const int REGULAR_FREQ = 4500; // Hz for regular beats
+const int ACCENT_FREQ = 3500;  // Hz for accent beats (last beat of sequence)
+
 // Rotary Encoder Interrupt Service Routine
 void IRAM_ATTR encoderISR() {
   static unsigned long lastInterruptTime = 0;
@@ -116,9 +123,9 @@ void setup() {
   pinMode(BTN2, INPUT_PULLUP);
   
   // Initialize rotary encoder pins
-  pinMode(ENCODER_CLK, INPUT_PULLUP);
-  pinMode(ENCODER_DT, INPUT_PULLUP);
-  pinMode(ENCODER_SW, INPUT_PULLUP);
+  pinMode(ENCODER_CLK, INPUT);
+  pinMode(ENCODER_DT, INPUT);
+  pinMode(ENCODER_SW, INPUT);
   
   // Attach interrupt for rotary encoder
   attachInterrupt(digitalPinToInterrupt(ENCODER_CLK), encoderISR, CHANGE);
@@ -127,7 +134,7 @@ void setup() {
   Wire.begin(4, 5); // SDA=4, SCL=5
   
   // PWM setup for speaker
-  ledcAttach(SPEAKER, 1000, 8); // Pin, frequency, resolution
+  ledcAttach(SPEAKER, 3000, 8); // Pin, frequency, resolution
   
   // Initialize preferences for EEPROM
   preferences.begin("metronome", false);
@@ -147,9 +154,9 @@ void setup() {
   
   // Initial display test
   u8g2.clearBuffer();
-  u8g2.setFont(u8g2_font_profont12_tf);
+  u8g2.setFont(u8g2_font_6x10_tf);
   u8g2.drawStr(0, 12, "Enhanced Metronome");
-  u8g2.drawStr(0, 22, "v2.0 - Encoder Ready");
+  u8g2.drawStr(0, 24, "v2.0 - Encoder Ready");
   u8g2.sendBuffer();
   
   Serial.println("Enhanced Metronome System initialized");
@@ -347,6 +354,12 @@ void handleBtn2LongPress() {
 void handleMetronome() {
   if (currentState != RUNNING) return;
   
+  // Handle tone turn-off (non-blocking)
+  if (toneActive && millis() - toneStartTime >= TONE_DURATION) {
+    ledcWrite(SPEAKER, 0);
+    toneActive = false;
+  }
+  
   // Determine current playing set based on type
   int currentBPM, currentNumerator, currentDenominator;
   
@@ -363,10 +376,24 @@ void handleMetronome() {
   unsigned long interval = 60000 / currentBPM;
   
   if (millis() - lastBeat >= interval) {
-    // Generate sound with higher frequency for better audibility  
-    ledcWriteTone(SPEAKER, 4500);
-    delay(20);
-    ledcWrite(SPEAKER, 0);
+    // Determine if this is the last beat of the current sequence
+    bool isLastBeatOfSequence = false;
+    
+    if (playingSetType == 0) {
+      // Factory preset - last beat before cycling to next preset
+      isLastBeatOfSequence = (beatCount == currentNumerator);
+    } else {
+      // Custom set - last beat of the last time signature in the sequence
+      bool isLastSet = (currentSet == workingSet.setCount - 1);
+      bool isLastBeatOfSet = (beatCount == currentNumerator);
+      isLastBeatOfSequence = isLastSet && isLastBeatOfSet;
+    }
+    
+    // Generate sound with accent for last beat of sequence
+    int frequency = isLastBeatOfSequence ? ACCENT_FREQ : REGULAR_FREQ;
+    ledcWriteTone(SPEAKER, frequency);
+    toneStartTime = millis();
+    toneActive = true;
     
     beatIndicator = !beatIndicator;
     lastBeat = millis();
@@ -448,7 +475,7 @@ void adjustBPM(int change) {
 }
 
 void adjustSetCount(int change) {
-  workingSet.setCount = constrain(workingSet.setCount + change, 1, 300);
+  workingSet.setCount = constrain(workingSet.setCount + change, 1, 16);
 }
 
 void adjustTimeSignature(int change) {
@@ -510,11 +537,6 @@ void startPlayback() {
   Serial.println("Starting playback");
 }
 
-void loadCustomSet(int index) {
-  // Load custom set from EEPROM
-  String key = "set_" + String(index);
-  // Implementation depends on how we store custom sets
-}
 
 void updateDisplay() {
   u8g2.clearBuffer();
@@ -547,73 +569,99 @@ void updateDisplay() {
 }
 
 void displayMainMenu() {
-  u8g2.setFont(u8g2_font_6x10_tf);
-  u8g2.drawStr(0, 10, "MAIN MENU");
+  u8g2.setFont(u8g2_font_4x6_tf);
+  u8g2.drawStr(0, 8, "MAIN MENU");
   
   const char* menuItems[] = {"Play Presets", "Create New", "Manage Sets", "Quick Play"};
   
+  // Two-column layout for better space utilization
   for (int i = 0; i < 4; i++) {
+    int col = i % 2;
+    int row = i / 2;
+    int x = col * 64;
+    int y = 16 + row * 8;
+    
     if (i == menuSelection) {
-      u8g2.drawStr(0, 20 + i * 8, "> ");
+      u8g2.drawStr(x, y, "> ");
     }
-    u8g2.drawStr(12, 20 + i * 8, menuItems[i]);
+    u8g2.drawStr(x + 8, y, menuItems[i]);
   }
 }
 
 void displayPlayPresetsMenu() {
-  u8g2.setFont(u8g2_font_6x10_tf);
-  u8g2.drawStr(0, 10, "SELECT PRESET");
+  u8g2.setFont(u8g2_font_4x6_tf);
+  u8g2.drawStr(0, 8, "SELECT PRESET");
   
-  // Show factory presets
+  // Show factory presets first
   for (int i = 0; i < 4; i++) {
+    int y = 16 + i * 6;
     if (i == menuSelection) {
-      u8g2.drawStr(0, 20 + i * 5, "> ");
+      u8g2.drawStr(0, y, "> ");
     }
-    u8g2.drawStr(12, 20 + i * 5, factoryPresets[i].name.c_str());
+    // Truncate long names to fit screen
+    String name = factoryPresets[i].name;
+    if (name.length() > 15) {
+      name = name.substring(0, 15);
+    }
+    u8g2.drawStr(8, y, name.c_str());
   }
   
-  // Show custom sets (if any)
-  // Implementation depends on custom set storage
+  // Show custom sets if any exist
+  if (customSetCount > 0) {
+    u8g2.drawStr(64, 16, "CUSTOM:");
+    for (int i = 0; i < min(customSetCount, 3); i++) {
+      int customIndex = i + 4;
+      int y = 22 + i * 6;
+      if (customIndex == menuSelection) {
+        u8g2.drawStr(64, y, "> ");
+      }
+      String customName = getCustomSetName(i);
+      if (customName.length() > 7) {
+        customName = customName.substring(0, 7);
+      }
+      u8g2.drawStr(72, y, customName.c_str());
+    }
+  }
 }
 
 void displayBPMSetting() {
-  u8g2.setFont(u8g2_font_6x10_tf);
-  u8g2.drawStr(0, 10, "SET BPM");
+  u8g2.setFont(u8g2_font_4x6_tf);
+  u8g2.drawStr(0, 8, "SET BPM");
   
-  char bpmStr[20];
-  sprintf(bpmStr, "BPM: %d", workingSet.bpm);
+  char bpmStr[10];
+  sprintf(bpmStr, "%d", workingSet.bpm);
   u8g2.setFont(u8g2_font_logisoso16_tn);
-  u8g2.drawStr(10, 25, bpmStr);
+  u8g2.drawStr(32, 22, bpmStr);
   
-  u8g2.setFont(u8g2_font_5x7_tf);
+  u8g2.setFont(u8g2_font_4x6_tf);
   u8g2.drawStr(0, 32, "Rotate to adjust");
 }
 
 void displaySetCountSetting() {
-  u8g2.setFont(u8g2_font_6x10_tf);
-  u8g2.drawStr(0, 10, "SET COUNT");
+  u8g2.setFont(u8g2_font_4x6_tf);
+  u8g2.drawStr(0, 8, "SET COUNT");
   
-  char countStr[20];
-  sprintf(countStr, "Count: %d", workingSet.setCount);
+  char countStr[10];
+  sprintf(countStr, "%d", workingSet.setCount);
   u8g2.setFont(u8g2_font_logisoso16_tn);
-  u8g2.drawStr(10, 25, countStr);
+  u8g2.drawStr(32, 22, countStr);
   
-  u8g2.setFont(u8g2_font_5x7_tf);
+  u8g2.setFont(u8g2_font_4x6_tf);
   u8g2.drawStr(0, 32, "Rotate to adjust");
 }
 
 void displayTimeSignatureSetting() {
-  u8g2.setFont(u8g2_font_6x10_tf);
-  char headerStr[20];
+  u8g2.setFont(u8g2_font_4x6_tf);
+  char headerStr[16];
   sprintf(headerStr, "SET %d/%d", currentTimeSignatureIndex + 1, workingSet.setCount);
-  u8g2.drawStr(0, 10, headerStr);
+  u8g2.drawStr(0, 8, headerStr);
   
-  char timeSigStr[20];
+  char timeSigStr[10];
   sprintf(timeSigStr, "%d/%d", workingSet.numerators[currentTimeSignatureIndex], workingSet.denominators[currentTimeSignatureIndex]);
   u8g2.setFont(u8g2_font_logisoso16_tn);
-  u8g2.drawStr(30, 25, timeSigStr);
+  u8g2.drawStr(32, 22, timeSigStr);
   
-  u8g2.setFont(u8g2_font_5x7_tf);
+  u8g2.setFont(u8g2_font_4x6_tf);
   u8g2.drawStr(0, 32, "CW:beats CCW:note");
 }
 
@@ -634,44 +682,44 @@ void displayPlayback() {
     setName = workingSet.name;
   }
   
-  // Beat indicator
+  // Beat indicator (left side)
   if (currentState == RUNNING) {
-    u8g2.drawDisc(8, 8, beatIndicator ? 5 : 2);
+    u8g2.drawDisc(6, 6, beatIndicator ? 4 : 2);
   } else {
-    u8g2.drawCircle(8, 8, 2);
+    u8g2.drawCircle(6, 6, 2);
   }
   
-  // Set name/number
-  u8g2.setFont(u8g2_font_6x10_tf);
-  char setStr[10];
+  // Set info (top row)
+  u8g2.setFont(u8g2_font_4x6_tf);
+  char setStr[8];
   sprintf(setStr, "S%d", currentSet + 1);
-  u8g2.drawStr(20, 10, setStr);
+  u8g2.drawStr(16, 8, setStr);
   
   // Time signature
   char timeSigStr[8];
   sprintf(timeSigStr, "%d/%d", currentNumerator, currentDenominator);
-  u8g2.drawStr(100, 10, timeSigStr);
+  u8g2.drawStr(32, 8, timeSigStr);
   
-  // BPM
+  // BPM (center, prominent)
   char bpmStr[10];
   sprintf(bpmStr, "%d", currentBPM);
   u8g2.setFont(u8g2_font_logisoso16_tn);
   int bpmWidth = u8g2.getStrWidth(bpmStr);
   u8g2.drawStr(64 - bpmWidth/2, 20, bpmStr);
   
-  u8g2.setFont(u8g2_font_5x7_tf);
-  u8g2.drawStr(64 - 10, 28, "BPM");
+  u8g2.setFont(u8g2_font_4x6_tf);
+  u8g2.drawStr(64 - 8, 26, "BPM");
   
-  // Status and beat count
+  // Status and beat count (bottom row)
   switch(currentState) {
     case RUNNING: 
-      u8g2.drawStr(2, 32, "PLAYING");
+      u8g2.drawStr(2, 32, "PLAY");
       char beatStr[8];
       sprintf(beatStr, "%d/%d", beatCount, currentNumerator);
       u8g2.drawStr(90, 32, beatStr);
       break;
     case PAUSED: 
-      u8g2.drawStr(2, 32, "PAUSED"); 
+      u8g2.drawStr(2, 32, "PAUSE"); 
       break;
   }
 }
@@ -725,7 +773,7 @@ void deleteCustomSet(int index) {
   preferences.remove((baseKey + "_count").c_str());
   
   // Remove time signatures
-  for (int i = 0; i < 300; i++) {
+  for (int i = 0; i < 16; i++) {
     preferences.remove((baseKey + "_num_" + String(i)).c_str());
     preferences.remove((baseKey + "_den_" + String(i)).c_str());
   }
